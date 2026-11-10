@@ -1,0 +1,48 @@
+{
+  "name": "farmacias-api",
+  "version": "1.0.0",
+  "description": "API de Carga Masiva y Gestión de Stock de Farmacias - CENABAST",
+  "main": "server.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "nodemon --watch src --watch .env src/server.ts --exec ts-node",
+    "test": "ts-node test/run_all_tests.ts",
+    "start": "node dist/server.js"
+  },
+  "keywords": [
+    "cenabast",
+    "stock",
+    "farmacias",
+    "api"
+  ],
+  "author": "CENABAST",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@types/cookie-parser": "^1.4.10",
+    "@types/dotenv": "^6.1.1",
+    "@types/express": "^5.0.6",
+    "@types/mssql": "^12.3.0",
+    "@types/swagger-ui-express": "^4.1.8",
+    "nodemon": "^3.1.14",
+    "ts-node": "^10.9.2",
+    "typescript": "^6.0.3"
+  },
+  "dependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.19",
+    "@types/express-rate-limit": "^5.1.3",
+    "@types/jsonwebtoken": "^9.0.10",
+    "bcryptjs": "^3.0.3",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "express-rate-limit": "^7.5.1",
+    "helmet": "^7.2.0",
+    "jsonwebtoken": "^9.0.3",
+    "mssql": "^12.5.4",
+    "swagger-ui-express": "^5.0.1",
+    "tedious": "^19.2.2"
+  }
+}

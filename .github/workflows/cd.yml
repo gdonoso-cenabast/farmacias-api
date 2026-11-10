@@ -1,0 +1,230 @@
+name: CD Farmacias API
+
+# Disparadores: Se ejecuta al hacer push a main, automáticamente al completarse el CI, o de forma manual
+on:
+  push:
+    branches: [ main ]          # Al subir cambios a main
+  workflow_run:
+    workflows: ["CI Farmacias API"] # Escucha la finalización del workflow de CI
+    branches: [ main ]
+    types:
+      - completed               # Se activa cuando el CI concluye con éxito
+  workflow_dispatch:            # Permite ejecutar el despliegue manual desde la interfaz de GitHub
+
+permissions:
+  actions: read                 # Permite leer el estado de las acciones
+  contents: read                # Permite leer el repositorio
+  packages: write               # Permite publicar imágenes Docker en GitHub Container Registry (ghcr.io)
+
+jobs:
+  deploy:
+    name: Build & Deploy to (Docker)
+    runs-on: self-hosted        # Ejecuta en el runner propio de Cenabast
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      # Paso 1: Clona el repositorio de la API en el runner
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Paso 2: Configura el entorno de Node.js versión 20
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      # Paso 3: Instala dependencias necesarias para compilar el backend
+      - name: Install dependencies
+        run: npm ci
+
+      # Paso 4: Compila TypeScript a JavaScript (genera la carpeta dist/)
+      - name: Build TypeScript
+        run: npm run build
+
+      # Paso 5: Autentica Docker con GitHub Container Registry (ghcr.io) usando el token interno
+      - name: Login to GitHub Container Registry
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      # Paso 6: Construye la imagen Docker del backend y la publica en el registro privado de GitHub
+      - name: Build and push Docker image
+        run: |
+          # Convierte el nombre del repositorio a minúsculas (requerimiento de Docker / ghcr.io)
+          IMAGE_NAME=$(echo "ghcr.io/${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "IMAGE_NAME=$IMAGE_NAME" >> $GITHUB_ENV
+          
+          # Construye la imagen asignando dos etiquetas: :latest y el hash del commit actual
+          echo "Construyendo imagen: $IMAGE_NAME..."
+          docker build -t "$IMAGE_NAME:latest" -t "$IMAGE_NAME:${{ github.sha }}" .
+          
+          # Sube ambas versiones de la imagen a GitHub Packages
+          echo "Publicando imagen en GHCR..."
+          docker push "$IMAGE_NAME:latest"
+          docker push "$IMAGE_NAME:${{ github.sha }}"
+
+      # Paso 7: Configura la llave SSH para conectarse al servidor 
+      - name: Setup SSH key
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }} # Clave SSH privada
+          SSH_HOST: ${{ secrets.SSH_HOST }}       # IP/Host del servidor 
+        run: |
+          # Crea la carpeta .ssh con permisos seguros
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          rm -f ~/.ssh/id_rsa*
+
+          # Valida que exista la clave en los secretos
+          if [ -z "$SSH_KEY" ]; then
+            echo "ERROR: La clave SSH privada no está configurada en los secretos del repositorio."
+            exit 1
+          fi
+
+          # Limpia caracteres especiales de Windows (\r y bytes nulos)
+          printf "%s\n" "$SSH_KEY" | tr -d '\r' | tr -d '\000' > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+
+          # Si viene codificada en Base64 o con \n literales, la decodifica al formato correcto
+          if ! grep -q "BEGIN" ~/.ssh/id_rsa; then
+            if echo "$SSH_KEY" | grep -q "BEGIN"; then
+              echo -e "$SSH_KEY" | tr -d '\r' | tr -d '\000' > ~/.ssh/id_rsa
+            else
+              echo "$SSH_KEY" | base64 -d 2>/dev/null | tr -d '\r' | tr -d '\000' > ~/.ssh/id_rsa || true
+            fi
+            chmod 600 ~/.ssh/id_rsa
+          fi
+
+          # Valida formato de la llave generada
+          echo "=== Verificación de formato de llave SSH ==="
+          if ssh-keygen -l -f ~/.ssh/id_rsa; then
+            echo "Llave SSH válida y cargada correctamente."
+          else
+            echo "ADVERTENCIA: Formato no estándar detectado en ~/.ssh/id_rsa."
+            echo "Línea 1:"
+            head -n 1 ~/.ssh/id_rsa | cat -v
+            echo "Última línea:"
+            tail -n 1 ~/.ssh/id_rsa | cat -v
+          fi
+
+          # Configura cliente SSH para conexión desatendida y compatibilidad de cifrado
+          cat > ~/.ssh/config <<EOF
+          Host *
+            IdentityFile ~/.ssh/id_rsa
+            StrictHostKeyChecking no
+            UserKnownHostsFile /dev/null
+            LogLevel ERROR
+            PubkeyAcceptedKeyTypes +ssh-rsa,rsa-sha2-256,rsa-sha2-512,ssh-ed25519
+            HostkeyAlgorithms +ssh-rsa,rsa-sha2-256,rsa-sha2-512,ssh-ed25519
+          EOF
+          chmod 600 ~/.ssh/config
+
+          # Registra huella del servidor remoto
+          if [ -n "$SSH_HOST" ]; then
+            ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+          fi
+
+      # Paso 8: Conexión remota por SSH al servidor para descargar y levantar el contenedor Docker
+      - name: Deploy Docker container to Server
+        env:
+          SSH_USER: ${{ secrets.SSH_USER }}       # Usuario SSH remoto
+          SSH_HOST: ${{ secrets.SSH_HOST }}       # IP o hostname remoto
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/var/www/html/api/farmacias-api' }} # Ruta del proyecto en servidor
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}                              # Nombre de la imagen Docker en GHCR
+          REGISTRY_USER: ${{ github.actor }}                             # Usuario de GitHub
+          REGISTRY_PASS: ${{ secrets.GITHUB_TOKEN }}                     # Token de GitHub para autenticar Docker
+        run: |
+          # Se ejecuta todo el siguiente script directamente dentro del servidor vía SSH
+          ssh -o BatchMode=yes "$SSH_USER@$SSH_HOST" \
+            "DEPLOY_PATH='$DEPLOY_PATH' IMAGE_NAME='$IMAGE_NAME' REGISTRY_USER='$REGISTRY_USER' REGISTRY_PASS='$REGISTRY_PASS' bash -s" << 'EOF'
+            set -e
+
+            echo "=== 1. Validando directorio destino y archivo .env ==="
+            mkdir -p "$DEPLOY_PATH"
+            # Si no existe .env en el servidor, aborta para evitar iniciar sin variables críticas de BD
+            if [ ! -f "$DEPLOY_PATH/.env" ]; then
+              echo "ERROR CRÍTICO: No existe el archivo $DEPLOY_PATH/.env en el servidor."
+              echo "Crea el archivo .env con las credenciales correspondientes antes de desplegar."
+              exit 1
+            fi
+
+            echo "=== 2. Autenticando en GitHub Container Registry en el servidor ==="
+            echo "$REGISTRY_PASS" | docker login ghcr.io -u "$REGISTRY_USER" --password-stdin
+
+            echo "=== 3. Descargando la última versión de la imagen Docker ==="
+            docker pull "$IMAGE_NAME:latest"
+
+            echo '=== 4. Deteniendo PM2 anterior si existe ==='
+            # Detiene proceso PM2 antiguo en caso de que antes corriera sin Docker
+            pm2 delete farmacias-api 2>/dev/null || true
+            pm2 save 2>/dev/null || true
+
+            echo '=== 5. Deteniendo contenedor previo si existe ==='
+            # Detiene y borra el contenedor Docker anterior
+            docker stop farmacias-api 2>/dev/null || true
+            docker rm farmacias-api 2>/dev/null || true
+
+            echo '=== 6. Normalizando .env e iniciando nuevo contenedor Docker ==='
+            # Limpia espacios extra del archivo .env para que Docker lo acepte sin errores
+            sed -E 's/^[[:space:]]*([a-zA-Z0-9_]+)[[:space:]]*=[[:space:]]*/\1=/' "$DEPLOY_PATH/.env" | grep -v '^[[:space:]]*$' > /tmp/farmacias-api.env
+
+            # Extrae el puerto configurado en el .env (o usa 5631 por defecto)
+            APP_PORT=$(grep -E '^PORT=' /tmp/farmacias-api.env | cut -d '=' -f2 | tr -d ' \r')
+            APP_PORT=${APP_PORT:-5631}
+            echo "Puerto detectado en .env del servidor: $APP_PORT"
+
+            # Mapea puertos exclusivamente a 127.0.0.1 (localhost) por seguridad, evitando exponer la API a internet directo
+            PORT_MAPPINGS="-p 127.0.0.1:5631:5631"
+            if [ "$APP_PORT" != "5631" ]; then
+              PORT_MAPPINGS="-p 127.0.0.1:5631:$APP_PORT -p 127.0.0.1:$APP_PORT:$APP_PORT"
+            fi
+
+            echo "Mapeo de puertos Docker protegido (127.0.0.1): $PORT_MAPPINGS"
+
+            # Arranca el contenedor con reinicio automático y las variables de entorno
+            docker run -d \
+              --name farmacias-api \
+              --restart always \
+              $PORT_MAPPINGS \
+              --env-file /tmp/farmacias-api.env \
+              "$IMAGE_NAME:latest"
+
+            rm -f /tmp/farmacias-api.env
+
+            echo '=== 7. Estado actual del contenedor ==='
+            docker ps --filter 'name=farmacias-api'
+
+            echo '=== 8. Limpiando imágenes antiguas en desuso ==='
+            docker image prune -f || true
+          EOF
+
+      # Paso 9: Verificación de salud (Health check) que comprueba que el contenedor responda peticiones HTTP
+      - name: Health check
+        env:
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/var/www/html/api/farmacias-api' }}
+        run: |
+          ssh -o BatchMode=yes "$SSH_USER@$SSH_HOST" "DEPLOY_PATH='$DEPLOY_PATH' bash -s" << 'EOF'
+            echo 'Esperando inicialización de la API (8 segundos)...'
+            sleep 8
+
+            # Lee el puerto configurado
+            APP_PORT=$(grep -E '^[[:space:]]*PORT[[:space:]]*=' "$DEPLOY_PATH/.env" | sed -E 's/^[[:space:]]*PORT[[:space:]]*=[[:space:]]*([0-9]+).*/\1/' | tr -d ' \r')
+            APP_PORT=${APP_PORT:-5631}
+
+            echo '=== Logs del contenedor farmacias-api ==='
+            docker logs farmacias-api --tail 25 || true
+
+            # Prueba con curl local si el endpoint principal devuelve respuesta HTTP exitosa
+            echo "=== Probando endpoint http://127.0.0.1:$APP_PORT/farmacias-api/estado ==="
+            if curl -fsS "http://127.0.0.1:$APP_PORT/farmacias-api/estado" > /dev/null 2>&1 || curl -fsS "http://127.0.0.1:5631/farmacias-api/estado" > /dev/null 2>&1; then
+              echo ">>> API en Docker respondiendo correctamente (HTTP OK) en http://apiweb-qa.cenabast.cl/farmacias-api <<<"
+            else
+              echo "ERROR: El endpoint de la API no respondió a tiempo."
+              echo 'Logs completos:'
+              docker logs farmacias-api --tail 50
+              exit 1
+            fi
+          EOF

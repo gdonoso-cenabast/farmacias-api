@@ -1,0 +1,53 @@
+name: CI Farmacias API
+
+# Disparadores: Se ejecuta al hacer push a main, crear un Pull Request hacia main o de forma manual
+on:
+  push:
+    branches: [ main ]          # Al subir cambios directos a la rama main
+  pull_request:
+    branches: [ main ]          # Al abrir o actualizar un PR hacia main
+  workflow_dispatch:            # Permite ejecutarlo manualmente desde GitHub Actions
+
+permissions:
+  contents: read                # Permiso de solo lectura sobre el código del repositorio
+
+jobs:
+  build_and_test:
+    name: Build & Test (CI)
+    runs-on: self-hosted        # Ejecuta en el runner/servidor propio de Cenabast
+    defaults:
+      run:
+        shell: bash             # Usa terminal bash por defecto
+
+    steps:
+      # Paso 1: Clona el código fuente del backend en el runner
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Paso 2: Configura Node.js versión 20 con caché para acelerar npm
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      # Paso 3: Instala dependencias limpias según el package-lock.json (incluye TypeScript y tipos)
+      - name: Install dependencies
+        run: npm ci
+
+      # Paso 4: Compila TypeScript a JavaScript (valida que no existan errores de tipos ni de sintaxis)
+      - name: Build TypeScript
+        run: npm run build
+
+      # Paso 5: Prueba la construcción de la imagen Docker para asegurar que el Dockerfile del backend sea válido
+      - name: Test Docker Build
+        run: docker build -t farmacias-api:test .
+
+      # Paso 6: Auditoría de seguridad OWASP / npm audit (Modo Informativo, no bloqueante)
+      # Analiza librerías de package.json contra bases de datos de vulnerabilidades conocidas (CVE)
+      - name: Security Audit (OWASP / npm audit)
+        continue-on-error: true # Permite que el CI continúe exitosamente aunque detecte advertencias
+        run: |
+          echo "=== Ejecutando auditoría de seguridad OWASP en dependencias del backend ==="
+          npm audit --audit-level=high || true
+          echo "Auditoría finalizada en modo informativo. Revisa las advertencias para planificar correcciones."

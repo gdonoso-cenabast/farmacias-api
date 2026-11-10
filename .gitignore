@@ -1,0 +1,44 @@
+# Dependencias
+node_modules/
+
+# Compilado de TypeScript
+dist/
+
+# Variables de entorno y credenciales
+.env
+.env.*
+
+# Configuración de editor e IDE
+.vscode/
+.idea/
+
+# Carpetas de herramientas y agentes locales
+.agents/
+herramienta-lector-editor-docx/
+
+# Scripts de base de datos
+sql/
+
+# Documentos locales y reglas internas
+documentos/
+/documentos
+reglas.txt
+*.docx
+*.pdf
+*.xlsx
+
+# Carpetas de diagramas y temporales
+temp_*/
+diagrams_output/
+sgdoc_diagrams/
+tracking_diagrams/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Archivos de sistema operativo
+.DS_Store
+Thumbs.db

@@ -1,0 +1,910 @@
+{
+    "openapi": "3.0.3",
+    "info": {
+        "title": "CENABAST - API Farmacias Adheridas",
+        "version": "1.0.0"
+    },
+    "servers": [
+        {
+            "url": "/farmacias-api",
+            "description": "Servidor API Web CENABAST (Desarrollo)"
+        },
+        {
+            "url": "/",
+            "description": "Servidor Local (Directo)"
+        }
+    ],
+    "components": {
+        "securitySchemes": {
+            "BearerAuth": {
+                "type": "http",
+                "scheme": "bearer",
+                "bearerFormat": "JWT",
+                "description": "Ingrese su token JWT generado en /autenticacion"
+            }
+        },
+        "schemas": {
+            "CredencialesLogin": {
+                "type": "object",
+                "required": [
+                    "rut",
+                    "contrasenia"
+                ],
+                "properties": {
+                    "rut": {
+                        "type": "integer",
+                        "example": 76031071,
+                        "description": "RUT numérico de la farmacia (sin puntos ni guion ni dígito verificador)"
+                    },
+                    "contrasenia": {
+                        "type": "string",
+                        "example": "Farmacias2026!",
+                        "description": "Contraseña de la farmacia"
+                    }
+                }
+            },
+            "RespuestaLogin": {
+                "type": "object",
+                "properties": {
+                    "mensaje": {
+                        "type": "string",
+                        "example": "Autenticación exitosa."
+                    },
+                    "token": {
+                        "type": "string",
+                        "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                    },
+                    "tipo_token": {
+                        "type": "string",
+                        "example": "Bearer"
+                    },
+                    "expiracion": {
+                        "type": "string",
+                        "example": "24h"
+                    },
+                    "farmacia": {
+                        "type": "object",
+                        "properties": {
+                            "identificador": {
+                                "type": "integer",
+                                "example": 1
+                            },
+                            "rut": {
+                                "type": "integer",
+                                "example": 76031071
+                            },
+                            "nombre": {
+                                "type": "string",
+                                "example": "Farmacias"
+                            }
+                        }
+                    }
+                }
+            },
+            "SucursalInput": {
+                "type": "object",
+                "required": [
+                    "nombre"
+                ],
+                "properties": {
+                    "nombre": {
+                        "type": "string",
+                        "example": "Sucursal Central Santiago",
+                        "description": "Nombre de la sucursal"
+                    },
+                    "direccion": {
+                        "type": "string",
+                        "example": "Av. Libertador Bernardo O Higgins 1234",
+                        "description": "Dirección física"
+                    },
+                    "comuna": {
+                        "type": "string",
+                        "example": "Santiago"
+                    },
+                    "region": {
+                        "type": "string",
+                        "example": "Metropolitana"
+                    },
+                    "telefono": {
+                        "type": "string",
+                        "example": "+56912345678"
+                    },
+                    "correo_electronico": {
+                        "type": "string",
+                        "example": "central@farmacia.cl"
+                    },
+                    "latitud": {
+                        "type": "string",
+                        "example": "-33.4489"
+                    },
+                    "longitud": {
+                        "type": "string",
+                        "example": "-70.6693"
+                    }
+                }
+            },
+            "SucursalEditarInput": {
+                "type": "object",
+                "required": [
+                    "identificador"
+                ],
+                "properties": {
+                    "identificador": {
+                        "type": "integer",
+                        "example": 1,
+                        "description": "Identificador único de la sucursal a editar"
+                    },
+                    "nombre": {
+                        "type": "string",
+                        "example": "Sucursal Central Santiago",
+                        "description": "Nombre de la sucursal"
+                    },
+                    "direccion": {
+                        "type": "string",
+                        "example": "Av. Libertador Bernardo O Higgins 1234",
+                        "description": "Dirección física"
+                    },
+                    "comuna": {
+                        "type": "string",
+                        "example": "Santiago"
+                    },
+                    "region": {
+                        "type": "string",
+                        "example": "Metropolitana"
+                    },
+                    "telefono": {
+                        "type": "string",
+                        "example": "+56912345678"
+                    },
+                    "correo_electronico": {
+                        "type": "string",
+                        "example": "central@farmacia.cl"
+                    },
+                    "latitud": {
+                        "type": "string",
+                        "example": "-33.4489"
+                    },
+                    "longitud": {
+                        "type": "string",
+                        "example": "-70.6693"
+                    }
+                }
+            },
+            "InventarioInput": {
+                "type": "object",
+                "required": [
+                    "identificador_sucursal",
+                    "identificador_remedio",
+                    "cantidad"
+                ],
+                "properties": {
+                    "identificador_sucursal": {
+                        "type": "integer",
+                        "example": 1,
+                        "description": "Identificador de la sucursal"
+                    },
+                    "identificador_remedio": {
+                        "type": "integer",
+                        "example": 1,
+                        "description": "Identificador del remedio"
+                    },
+                    "cantidad": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 150,
+                        "description": "Stock real disponible"
+                    },
+                    "lote": {
+                        "type": "string",
+                        "example": "LOT-2026A",
+                        "description": "Código de lote de fabricación"
+                    },
+                    "fecha_vencimiento": {
+                        "type": "string",
+                        "format": "date",
+                        "example": "2026-12-31",
+                        "description": "Fecha de vencimiento (YYYY-MM-DD)"
+                    }
+                }
+            },
+            "InventarioEditarInput": {
+                "type": "object",
+                "required": [
+                    "identificador",
+                    "identificador_sucursal",
+                    "identificador_remedio"
+                ],
+                "properties": {
+                    "identificador": {
+                        "type": "integer",
+                        "example": 1,
+                        "description": "Identificador único del registro de inventario a modificar"
+                    },
+                    "identificador_sucursal": {
+                        "type": "integer",
+                        "example": 1,
+                        "description": "Identificador de la sucursal"
+                    },
+                    "identificador_remedio": {
+                        "type": "integer",
+                        "example": 1,
+                        "description": "Identificador del remedio"
+                    },
+                    "cantidad": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 150,
+                        "description": "Stock real disponible"
+                    },
+                    "lote": {
+                        "type": "string",
+                        "example": "LOT-2026A",
+                        "description": "Código de lote de fabricación"
+                    },
+                    "fecha_vencimiento": {
+                        "type": "string",
+                        "format": "date",
+                        "example": "2026-12-31",
+                        "description": "Fecha de vencimiento (YYYY-MM-DD)"
+                    }
+                }
+            },
+            "ErrorResponse": {
+                "type": "object",
+                "properties": {
+                    "error": {
+                        "type": "string",
+                        "example": "Descripción del error."
+                    }
+                }
+            },
+            "RemedioItem": {
+                "type": "object",
+                "properties": {
+                    "identificador": {
+                        "type": "integer",
+                        "example": 1,
+                        "description": "Identificador único del medicamento"
+                    },
+                    "ZGEN": {
+                        "type": "string",
+                        "example": "100000000",
+                        "description": "Código de material o ZGEN del medicamento"
+                    },
+                    "nombre": {
+                        "type": "string",
+                        "example": "PARACETAMOL 500 MG COMPRIMIDO",
+                        "description": "Texto breve o descripción del medicamento"
+                    }
+                }
+            },
+            "SucursalEliminarInput": {
+                "type": "object",
+                "required": [
+                    "identificador"
+                ],
+                "properties": {
+                    "identificador": {
+                        "type": "integer",
+                        "example": 1,
+                        "description": "Identificador único de la sucursal a desactivar"
+                    }
+                }
+            },
+            "InventarioEliminarInput": {
+                "type": "object",
+                "required": [
+                    "identificador",
+                    "identificador_sucursal",
+                    "identificador_remedio"
+                ],
+                "properties": {
+                    "identificador": {
+                        "type": "integer",
+                        "example": 1,
+                        "description": "Identificador único del registro de inventario a desactivar"
+                    },
+                    "identificador_sucursal": {
+                        "type": "integer",
+                        "example": 1,
+                        "description": "Identificador de la sucursal"
+                    },
+                    "identificador_remedio": {
+                        "type": "integer",
+                        "example": 1,
+                        "description": "Identificador del medicamento"
+                    }
+                }
+            },
+            "SucursalConsultaInput": {
+                "type": "object",
+                "required": [
+                    "identificador"
+                ],
+                "properties": {
+                    "identificador": {
+                        "type": "integer",
+                        "example": 1,
+                        "description": "Identificador único de la sucursal a consultar"
+                    }
+                }
+            },
+            "InventarioConsultaInput": {
+                "type": "object",
+                "properties": {
+                    "identificador": {
+                        "type": "integer",
+                        "example": 1,
+                        "description": "Identificador directo del registro de inventario"
+                    },
+                    "identificador_sucursal": {
+                        "type": "integer",
+                        "example": 1,
+                        "description": "Identificador de la sucursal"
+                    },
+                    "identificador_remedio": {
+                        "type": "integer",
+                        "example": 1,
+                        "description": "Identificador del medicamento"
+                    }
+                }
+            },
+            "RemedioConsultaInput": {
+                "type": "object",
+                "required": [
+                    "identificador"
+                ],
+                "properties": {
+                    "identificador": {
+                        "type": "integer",
+                        "example": 1,
+                        "description": "Identificador único del remedio a consultar"
+                    }
+                }
+            }
+        }
+    },
+    "paths": {
+        "/estado": {
+            "get": {
+                "tags": [
+                    "Sistema"
+                ],
+                "summary": "Comprobar estado de la API",
+                "description": "Verifica la disponibilidad y estado en línea del servicio.",
+                "responses": {
+                    "200": {
+                        "description": "Servicio en línea",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "servicio": {
+                                            "type": "string",
+                                            "example": "CENABAST - API Farmacias Adheridas"
+                                        },
+                                        "estado": {
+                                            "type": "string",
+                                            "example": "ONLINE"
+                                        },
+                                        "version": {
+                                            "type": "string",
+                                            "example": "1.0.0"
+                                        },
+                                        "documentacion": {
+                                            "type": "string",
+                                            "example": "/documentacion"
+                                        },
+                                        "fechaHora": {
+                                            "type": "string",
+                                            "example": "2026-10-19T22:00:00.000Z"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/autenticacion": {
+            "post": {
+                "tags": [
+                    "Autenticación"
+                ],
+                "summary": "Obtener Token Bearer",
+                "description": "Verifica las credenciales de la farmacia y devuelve el token JWT.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CredencialesLogin"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Autenticación exitosa",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RespuestaLogin"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Parámetros obligatorios faltantes"
+                    },
+                    "401": {
+                        "description": "Credenciales inválidas o cuenta inactiva"
+                    }
+                }
+            }
+        },
+        "/sucursales/registrar": {
+            "post": {
+                "tags": [
+                    "Sucursales"
+                ],
+                "summary": "Registrar una o múltiples sucursales",
+                "description": "Inserta una o muchas sucursales (acepta un objeto individual o un arreglo de sucursales).",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "$ref": "#/components/schemas/SucursalInput"
+                                    },
+                                    {
+                                        "type": "array",
+                                        "items": {
+                                            "$ref": "#/components/schemas/SucursalInput"
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Sucursal(es) registrada(s) con éxito"
+                    },
+                    "400": {
+                        "description": "Datos incompletos o inválidos"
+                    },
+                    "401": {
+                        "description": "No autorizado"
+                    }
+                }
+            }
+        },
+        "/sucursales/editar": {
+            "put": {
+                "tags": [
+                    "Sucursales"
+                ],
+                "summary": "Editar una o múltiples sucursales",
+                "description": "Actualiza los datos de una o varias sucursales activas (acepta un objeto individual o un arreglo).",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "description": "Arreglo de objetos JSON con las sucursales a editar (cada una con su identificador)",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/SucursalEditarInput"
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Sucursales editadas correctamente"
+                    },
+                    "400": {
+                        "description": "Identificador ausente o inválido"
+                    },
+                    "401": {
+                        "description": "No autorizado"
+                    }
+                }
+            }
+        },
+        "/sucursales/eliminar": {
+            "delete": {
+                "tags": [
+                    "Sucursales"
+                ],
+                "summary": "Eliminar una o múltiples sucursales",
+                "description": "Elimina una o varias sucursales del sistema.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "description": "Arreglo de objetos JSON con las sucursales a desactivar lógicamente",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/SucursalEliminarInput"
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Sucursales eliminadas con éxito"
+                    },
+                    "400": {
+                        "description": "Identificadores faltantes"
+                    },
+                    "401": {
+                        "description": "No autorizado"
+                    }
+                }
+            }
+        },
+        "/sucursales/consultar": {
+            "get": {
+                "tags": [
+                    "Sucursales"
+                ],
+                "summary": "Consultar todas las sucursales (GET sin parámetros)",
+                "description": "Método GET sin parámetros: Retorna la totalidad de sucursales activas de la farmacia autenticada sin aplicar filtros ni requerir cuerpo (BODY).",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Listado completo de sucursales activas obtenido exitosamente"
+                    },
+                    "401": {
+                        "description": "No autorizado"
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "Sucursales"
+                ],
+                "summary": "Consultar sucursales por parámetros (POST con arreglo de identificadores)",
+                "description": "Método POST con parámetros: Retorna únicamente las sucursales de la farmacia que coincidan con el arreglo JSON de identificadores enviado en el cuerpo (BODY).",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "description": "Arreglo de objetos JSON con los identificadores de sucursales a consultar",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/SucursalConsultaInput"
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Listado de sucursales coincidentes obtenido exitosamente"
+                    },
+                    "400": {
+                        "description": "Parámetros de consulta faltantes o inválidos"
+                    },
+                    "401": {
+                        "description": "No autorizado"
+                    }
+                }
+            }
+        },
+        "/remedios/consultar": {
+            "get": {
+                "tags": [
+                    "Remedios"
+                ],
+                "summary": "Consultar todos los remedios (GET sin parámetros)",
+                "description": "Método GET sin parámetros: Retorna la totalidad de remedios disponibles en la vista view_Remedios sin aplicar filtros ni requerir cuerpo (BODY).",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Catálogo completo de medicamentos obtenido exitosamente",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "total": {
+                                            "type": "integer",
+                                            "example": 2
+                                        },
+                                        "remedios": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/RemedioItem"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "No autorizado"
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "Remedios"
+                ],
+                "summary": "Consultar remedios por parámetros (POST con arreglo de identificadores)",
+                "description": "Método POST con parámetros: Retorna únicamente los remedios de la vista view_Remedios que coincidan con el arreglo JSON de identificadores enviado en el cuerpo (BODY).",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "description": "Arreglo de objetos JSON con los identificadores de remedios a consultar",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/RemedioConsultaInput"
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Listado de medicamentos coincidentes obtenido exitosamente",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "total": {
+                                            "type": "integer",
+                                            "example": 1
+                                        },
+                                        "remedios": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/RemedioItem"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Debe especificar al menos un identificador de remedio a consultar"
+                    },
+                    "401": {
+                        "description": "No autorizado"
+                    }
+                }
+            }
+        },
+        "/inventarios/registrar": {
+            "post": {
+                "tags": [
+                    "Inventarios"
+                ],
+                "summary": "Registrar existencias de inventario",
+                "description": "Registra o actualiza las existencias de inventario de las sucursales.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "$ref": "#/components/schemas/InventarioInput"
+                                    },
+                                    {
+                                        "type": "array",
+                                        "items": {
+                                            "$ref": "#/components/schemas/InventarioInput"
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Resumen de existencias procesadas"
+                    },
+                    "400": {
+                        "description": "Datos de inventario faltantes o inválidos"
+                    },
+                    "401": {
+                        "description": "No autorizado"
+                    }
+                }
+            }
+        },
+        "/inventarios/editar": {
+            "put": {
+                "tags": [
+                    "Inventarios"
+                ],
+                "summary": "Editar existencias de uno o múltiples inventarios",
+                "description": "Actualiza directamente las cantidades de stock de uno o varios registros de inventario.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "description": "Arreglo de objetos JSON con los registros de inventario a editar",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/InventarioEditarInput"
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Inventario(s) editado(s) correctamente"
+                    },
+                    "400": {
+                        "description": "Datos inválidos"
+                    },
+                    "401": {
+                        "description": "No autorizado"
+                    }
+                }
+            }
+        },
+        "/inventarios/eliminar": {
+            "delete": {
+                "tags": [
+                    "Inventarios"
+                ],
+                "summary": "Eliminar registros de inventario",
+                "description": "Elimina los registros de existencias indicados.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "description": "Arreglo de objetos JSON con los registros de inventario a desactivar lógicamente",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/InventarioEliminarInput"
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Inventarios eliminados con éxito"
+                    },
+                    "400": {
+                        "description": "Identificadores faltantes"
+                    },
+                    "401": {
+                        "description": "No autorizado"
+                    }
+                }
+            }
+        },
+        "/inventarios/consultar": {
+            "get": {
+                "tags": [
+                    "Inventarios"
+                ],
+                "summary": "Consultar todos los inventarios (GET sin parámetros)",
+                "description": "Método GET sin parámetros: Retorna la totalidad de existencias de inventario activas de la farmacia autenticada sin aplicar filtros ni requerir cuerpo (BODY).",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Listado completo de existencias de inventario obtenido exitosamente"
+                    },
+                    "401": {
+                        "description": "No autorizado"
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "Inventarios"
+                ],
+                "summary": "Consultar inventarios por parámetros (POST con criterios en BODY)",
+                "description": "Método POST con parámetros: Retorna únicamente las existencias de inventario que coincidan con el arreglo JSON de criterios enviado en el cuerpo (BODY).",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "description": "Arreglo de criterios de consulta de existencias",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/InventarioConsultaInput"
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Listado de existencias coincidentes obtenido exitosamente"
+                    },
+                    "400": {
+                        "description": "Parámetros de consulta faltantes o inválidos"
+                    },
+                    "401": {
+                        "description": "No autorizado"
+                    }
+                }
+            }
+        }
+    }
+}
